@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClickSafe API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        textarea { width: 100%; height: 100px; margin: 10px 0; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .result { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🛡️ ClickSafe API Connection Test</h1>
+    
+    <div id="connection-status" class="status warning">Testing API connection...</div>
+    
+    <div>
+        <h3>Test Message:</h3>
+        <textarea id="testMessage" placeholder="Enter a message to test...">Click here to verify your account immediately! Your account will be suspended if you don't act now!</textarea>
+        <br>
+        <button id="testBtn" onclick="testAPI()" disabled>Test Phishing Detection</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script>
+        let apiConnected = false;
+
+        // Test connection on page load
+        async function testConnection() {
+            try {
+                const response = await fetch('http://localhost:8000/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('connection-status').innerHTML = 
+                        `✅ API Connected Successfully<br>Status: ${data.status}<br>Model Loaded: ${data.model_loaded}`;
+                    document.getElementById('connection-status').className = 'status success';
+                    apiConnected = true;
+                    document.getElementById('testBtn').disabled = false;
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                document.getElementById('connection-status').innerHTML = 
+                    `❌ API Connection Failed: ${error.message}<br>Make sure backend server is running on port 8000`;
+                document.getElementById('connection-status').className = 'status error';
+            }
+        }
+
+        async function testAPI() {
+            if (!apiConnected) return;
+
+            const message = document.getElementById('testMessage').value.trim();
+            if (!message) {
+                alert('Please enter a message to test');
+                return;
+            }
+
+            const button = document.getElementById('testBtn');
+            button.disabled = true;
+            button.textContent = 'Testing...';
+
+            try {
+                const response = await fetch('http://localhost:8000/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = `
+                    <div class="result">
+                        <h3>🔍 Analysis Results:</h3>
+                        <p><strong>Language:</strong> ${result.language} ${getLanguageFlag(result.language)}</p>
+                        <p><strong>Classification:</strong> <span style="color: ${result.is_safe ? 'green' : 'red'}">${result.classification.toUpperCase()}</span></p>
+                        <p><strong>Risk Score:</strong> ${result.risk_score}%</p>
+                        <p><strong>Is Safe:</strong> ${result.is_safe ? '✅ Yes' : '⚠️ No'}</p>
+                        <p><strong>Suspicious Terms:</strong> ${result.suspicious_terms.join(', ') || 'None'}</p>
+                        <p><strong>Explanation:</strong> ${result.explanation}</p>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('results').innerHTML = 
+                    `<div class="status error">❌ Test Failed: ${error.message}</div>`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Test Phishing Detection';
+            }
+        }
+
+        function getLanguageFlag(language) {
+            const flags = {
+                english: '🇺🇸',
+                sinhala: '🇱🇰',
+                tamil: '🇱🇰'
+            };
+            return flags[language] || '🌐';
+        }
+
+        // Test connection when page loads
+        testConnection();
+    </script>
+</body>
+</html>

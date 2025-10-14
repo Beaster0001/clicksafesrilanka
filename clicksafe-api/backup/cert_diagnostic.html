@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CERT Reporting Diagnostic Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .loading {
+            color: #856404;
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        h2 {
+            color: #555;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .two-column {
+                grid-template-columns: 1fr;
+            }
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-online { background-color: #28a745; }
+        .status-offline { background-color: #dc3545; }
+        .status-warning { background-color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 CERT Reporting Diagnostic Tool</h1>
+        <p>This tool diagnoses and tests CERT reporting functionality for both phishing detection and QR scanning.</p>
+        
+        <h2>System Status</h2>
+        <div id="systemStatus">
+            <p><span id="backendStatus" class="status-indicator status-offline"></span>Backend API: <span id="backendText">Checking...</span></p>
+            <p><span id="certStatus" class="status-indicator status-offline"></span>CERT Service: <span id="certText">Checking...</span></p>
+        </div>
+        
+        <h2>Step 1: Authentication</h2>
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <input type="text" id="username" value="admin" />
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" value="admin123" />
+        </div>
+        <button onclick="login()">Login</button>
+        <button onclick="checkAuthStatus()">Check Auth Status</button>
+        
+        <div id="authResult" class="result info" style="display: none;"></div>
+    </div>
+
+    <div class="two-column">
+        <div class="container">
+            <h2>Test 1: Phishing Detection CERT</h2>
+            <div class="form-group">
+                <label for="phishingUrl">Phishing URL:</label>
+                <input type="text" id="phishingUrl" value="https://fake-paypal-login.com/secure" />
+            </div>
+            <div class="form-group">
+                <label for="phishingContent">Content:</label>
+                <textarea id="phishingContent" rows="3">Urgent: Your PayPal account has been limited. Click here to verify your identity immediately.</textarea>
+            </div>
+            <div class="form-group">
+                <label for="phishingRiskScore">Risk Score:</label>
+                <input type="number" id="phishingRiskScore" value="92" min="50" max="100" />
+            </div>
+            <div class="form-group">
+                <label for="phishingComments">Comments:</label>
+                <textarea id="phishingComments" rows="2">User reported suspicious PayPal phishing email</textarea>
+            </div>
+            <button onclick="testPhishingCERT()" id="phishingBtn" disabled>Test Phishing CERT</button>
+            
+            <div id="phishingResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="container">
+            <h2>Test 2: QR Code CERT</h2>
+            <div class="form-group">
+                <label for="qrUrl">QR URL:</label>
+                <input type="text" id="qrUrl" value="https://suspicious-qr-site.com/malware" />
+            </div>
+            <div class="form-group">
+                <label for="qrRiskScore">Risk Score:</label>
+                <input type="number" id="qrRiskScore" value="87" min="50" max="100" />
+            </div>
+            <div class="form-group">
+                <label for="qrRiskLevel">Risk Level:</label>
+                <select id="qrRiskLevel">
+                    <option value="medium">Medium</option>
+                    <option value="high" selected>High</option>
+                    <option value="critical">Critical</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="qrComments">Comments:</label>
+                <textarea id="qrComments" rows="2">QR code found on suspicious poster in public area</textarea>
+            </div>
+            <button onclick="testQRCERT()" id="qrBtn" disabled>Test QR CERT</button>
+            
+            <div id="qrResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Diagnostic Information</h2>
+        <button onclick="checkBackendHealth()">Check Backend Health</button>
+        <button onclick="checkCERTStatus()">Check CERT Service Status</button>
+        <button onclick="testEmailTemplate()">Test Email Template</button>
+        <button onclick="viewBackendLogs()">View Backend Logs</button>
+        
+        <div id="diagnosticResult" class="result info" style="display: none;"></div>
+    </div>
+
+    <script>
+        let authToken = null;
+        const API_BASE = 'http://localhost:8000';
+
+        // Check system status on load
+        window.addEventListener('load', async () => {
+            await checkSystemStatus();
+        });
+
+        async function checkSystemStatus() {
+            // Check backend
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                if (response.ok) {
+                    document.getElementById('backendStatus').className = 'status-indicator status-online';
+                    document.getElementById('backendText').textContent = 'Online';
+                } else {
+                    document.getElementById('backendStatus').className = 'status-indicator status-warning';
+                    document.getElementById('backendText').textContent = 'Warning';
+                }
+            } catch (error) {
+                document.getElementById('backendStatus').className = 'status-indicator status-offline';
+                document.getElementById('backendText').textContent = 'Offline';
+            }
+
+            // Check CERT service
+            try {
+                const response = await fetch(`${API_BASE}/api/cert/status`);
+                if (response.ok) {
+                    document.getElementById('certStatus').className = 'status-indicator status-online';
+                    document.getElementById('certText').textContent = 'Online';
+                } else {
+                    document.getElementById('certStatus').className = 'status-indicator status-warning';
+                    document.getElementById('certText').textContent = 'Warning';
+                }
+            } catch (error) {
+                document.getElementById('certStatus').className = 'status-indicator status-offline';
+                document.getElementById('certText').textContent = 'Offline';
+            }
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('authResult');
+            
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Logging in...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('password', password);
+                
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.access_token) {
+                    authToken = data.access_token;
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ Login successful!\nToken: ${authToken.substring(0, 50)}...\nUser: ${data.user?.email || 'Unknown'}`;
+                    document.getElementById('phishingBtn').disabled = false;
+                    document.getElementById('qrBtn').disabled = false;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Login failed: ${data.detail || 'Unknown error'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `💥 Login error: ${error.message}`;
+            }
+        }
+
+        async function testPhishingCERT() {
+            if (!authToken) {
+                alert('Please login first!');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('phishingResult');
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing phishing CERT report...';
+            
+            const reportData = {
+                url: document.getElementById('phishingUrl').value,
+                content: document.getElementById('phishingContent').value,
+                risk_score: parseInt(document.getElementById('phishingRiskScore').value),
+                risk_level: 'critical',
+                classification: 'phishing',
+                confidence: 0.94,
+                reasoning: 'Brand impersonation detected with credential harvesting indicators',
+                security_analysis: {
+                    classification: 'phishing',
+                    threat_indicators: {
+                        brand_impersonation: true,
+                        urgency_tactics: true,
+                        credential_harvesting: true
+                    }
+                },
+                comments: document.getElementById('phishingComments').value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/cert/report`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(reportData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ Phishing CERT Report Submitted Successfully!
+Report ID: ${data.report_id}
+Message: ${data.message}
+Submitted At: ${new Date(data.submitted_at).toLocaleString()}
+
+📧 Check your email and backend logs for confirmation!`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Phishing CERT submission failed:
+Status: ${response.status}
+Error: ${data.detail || 'Unknown error'}
+Response: ${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `💥 Phishing CERT error: ${error.message}`;
+            }
+        }
+
+        async function testQRCERT() {
+            if (!authToken) {
+                alert('Please login first!');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('qrResult');
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing NEW QR CERT implementation...';
+            
+            // NEW IMPLEMENTATION: Use exact same structure as working phishing detection
+            const reportData = {
+                url: document.getElementById('qrUrl').value,
+                content: `QR code detected leading to malicious site: ${document.getElementById('qrUrl').value}. User comments: ${document.getElementById('qrComments').value}`,
+                risk_score: parseInt(document.getElementById('qrRiskScore').value),
+                risk_level: document.getElementById('qrRiskLevel').value,
+                classification: 'malicious_qr_code',
+                confidence: parseInt(document.getElementById('qrRiskScore').value) / 100.0,
+                reasoning: `QR code analysis detected ${document.getElementById('qrRiskLevel').value} risk level with score ${document.getElementById('qrRiskScore').value}/100`,
+                security_analysis: {
+                    classification: 'malicious_qr_code',
+                    threat_indicators: {
+                        suspicious_qr_code: true,
+                        malicious_url: true
+                    }
+                },
+                comments: document.getElementById('qrComments').value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/qr/report/cert`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(reportData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ NEW QR CERT Implementation - Report Submitted Successfully!
+Report ID: ${data.report_id}
+Message: ${data.message}
+Submitted At: ${new Date(data.submitted_at).toLocaleString()}
+
+🎉 The new QR CERT implementation is working!
+📧 Check your email and backend logs for confirmation!`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ QR CERT submission failed:
+Status: ${response.status}
+Error: ${data.detail || 'Unknown error'}
+Response: ${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `💥 QR CERT error: ${error.message}`;
+            }
+        }
+
+        async function checkBackendHealth() {
+            const resultDiv = document.getElementById('diagnosticResult');
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Checking backend health...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ Backend Health Check:
+Status: ${data.status}
+Detector: ${data.detector}
+Timestamp: ${new Date().toLocaleString()}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Backend health check failed: ${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `💥 Backend health error: ${error.message}`;
+            }
+        }
+
+        async function checkCERTStatus() {
+            const resultDiv = document.getElementById('diagnosticResult');
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Checking CERT service status...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/cert/status`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result info';
+                    resultDiv.textContent = `📊 CERT Service Status:
+Service: ${data.service}
+Status: ${data.status}
+Email Service: ${data.email_service}
+Recipient: ${data.recipient}
+Sender: ${data.sender}
+Risk Threshold: ${data.minimum_risk_threshold}%
+Last Updated: ${new Date(data.last_updated).toLocaleString()}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ CERT status check failed: ${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `💥 CERT status error: ${error.message}`;
+            }
+        }
+
+        async function testEmailTemplate() {
+            if (!authToken) {
+                alert('Please login first with admin credentials!');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('diagnosticResult');
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing email template...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/cert/test-template`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ Email Template Test:
+${data.message}
+
+📧 HTML Preview Generated Successfully!
+(Check network tab for full HTML content)`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Email template test failed: ${data.detail || 'Unknown error'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `💥 Email template error: ${error.message}`;
+            }
+        }
+
+        function viewBackendLogs() {
+            const resultDiv = document.getElementById('diagnosticResult');
+            resultDiv.className = 'result info';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = `📋 Backend Logs Information:
+
+To view backend logs:
+1. Check the terminal running the backend server
+2. Look for log entries with timestamps
+3. Watch for CERT-related messages during testing
+4. Check for any error messages or stack traces
+
+Common log patterns to look for:
+✅ "CERT report submission attempt by..."
+✅ "CERT report ... successfully submitted..."
+❌ "Failed to send report to CERT..."
+❌ "CERT email service error..."
+
+Backend is running at: ${API_BASE}
+Terminal should show real-time logs during API calls.`;
+        }
+
+        async function checkAuthStatus() {
+            const resultDiv = document.getElementById('authResult');
+            resultDiv.className = 'result info';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = `Current Authentication Status:
+Token: ${authToken ? 'Present' : 'Not set'}
+Token Length: ${authToken ? authToken.length : 0}
+Login Required: ${authToken ? 'No' : 'Yes'}`;
+        }
+    </script>
+</body>
+</html>

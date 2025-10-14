@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR CERT Test Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .loading {
+            color: #856404;
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        h2 {
+            color: #555;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 QR CERT Test Interface</h1>
+        <p>This interface tests the QR CERT submission functionality directly through the API.</p>
+        
+        <h2>Step 1: Login</h2>
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <input type="text" id="username" value="admin" />
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" value="admin123" />
+        </div>
+        <button onclick="login()">Login</button>
+        <button onclick="checkAuthStatus()">Check Auth Status</button>
+        
+        <div id="authResult" class="result info" style="display: none;"></div>
+        
+        <h2>Step 2: Submit QR CERT Report</h2>
+        <div class="form-group">
+            <label for="qrUrl">QR URL:</label>
+            <input type="text" id="qrUrl" value="https://suspicious-qr-site.com/phishing" />
+        </div>
+        <div class="form-group">
+            <label for="riskScore">Risk Score (50-100):</label>
+            <input type="number" id="riskScore" value="85" min="50" max="100" />
+        </div>
+        <div class="form-group">
+            <label for="riskLevel">Risk Level:</label>
+            <select id="riskLevel">
+                <option value="medium">Medium</option>
+                <option value="high" selected>High</option>
+                <option value="critical">Critical</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="userComments">User Comments:</label>
+            <textarea id="userComments" rows="3">This QR code looked very suspicious during scanning. Potential phishing attempt.</textarea>
+        </div>
+        <button onclick="submitQRCERT()" id="submitBtn" disabled>Submit QR CERT Report</button>
+        <button onclick="testCERTService()">Test CERT Service Status</button>
+        
+        <div id="certResult" class="result" style="display: none;"></div>
+        
+        <h2>Step 3: Monitor Backend Logs</h2>
+        <p>Check the backend terminal for detailed logs showing the email sending process.</p>
+        <p><strong>Expected behavior:</strong> If working correctly, you should see:</p>
+        <ul>
+            <li>✅ "QR CERT report submission attempt by admin@clicksafe.com..."</li>
+            <li>✅ "QR CERT: Calling production_cert_service.send_cert_report()..."</li>
+            <li>✅ "QR CERT: Email service returned: True"</li>
+            <li>✅ "QR CERT report ... successfully submitted for URL: ..."</li>
+        </ul>
+    </div>
+
+    <script>
+        let authToken = null;
+        const API_BASE = 'http://localhost:8000';
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('authResult');
+            
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Logging in...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('password', password);
+                
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.access_token) {
+                    authToken = data.access_token;
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ Login successful!\nToken: ${authToken.substring(0, 50)}...`;
+                    document.getElementById('submitBtn').disabled = false;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Login failed: ${data.detail || 'Unknown error'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `💥 Login error: ${error.message}`;
+            }
+        }
+
+        async function checkAuthStatus() {
+            const resultDiv = document.getElementById('authResult');
+            resultDiv.className = 'result info';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = `Current auth token: ${authToken ? 'Present' : 'Not set'}\nToken length: ${authToken ? authToken.length : 0}`;
+        }
+
+        async function submitQRCERT() {
+            if (!authToken) {
+                alert('Please login first!');
+                return;
+            }
+            
+            const qrUrl = document.getElementById('qrUrl').value;
+            const riskScore = parseInt(document.getElementById('riskScore').value);
+            const riskLevel = document.getElementById('riskLevel').value;
+            const userComments = document.getElementById('userComments').value;
+            const resultDiv = document.getElementById('certResult');
+            
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Submitting QR CERT report...';
+            
+            try {
+                const reportData = {
+                    qr_url: qrUrl,
+                    risk_score: riskScore,
+                    risk_level: riskLevel,
+                    user_comments: userComments,
+                    scan_id: `test-scan-${Date.now()}`
+                };
+                
+                console.log('Sending QR CERT report:', reportData);
+                
+                const response = await fetch(`${API_BASE}/qr/report/cert`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(reportData)
+                });
+                
+                const data = await response.json();
+                console.log('QR CERT response:', data);
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ QR CERT Report Submitted Successfully!
+Report ID: ${data.report_id}
+Message: ${data.message}
+Email Sent: ${data.cert_email_sent}
+Submitted At: ${new Date(data.submitted_at).toLocaleString()}
+
+Check the backend terminal for detailed email sending logs!`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ QR CERT submission failed: ${data.detail || 'Unknown error'}
+Status: ${response.status}
+Response: ${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `💥 QR CERT error: ${error.message}`;
+            }
+        }
+
+        async function testCERTService() {
+            const resultDiv = document.getElementById('certResult');
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing CERT service status...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/cert/status`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result info';
+                    resultDiv.textContent = `📊 CERT Service Status:
+Service: ${data.service}
+Status: ${data.status}
+Email Service: ${data.email_service}
+Recipient: ${data.recipient}
+Sender: ${data.sender}
+Risk Threshold: ${data.minimum_risk_threshold}%
+Last Updated: ${new Date(data.last_updated).toLocaleString()}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ CERT service status failed: ${data.detail || 'Unknown error'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `💥 CERT service error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

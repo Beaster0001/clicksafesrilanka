@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR CERT Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .loading {
+            color: #856404;
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        h2 {
+            color: #555;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 QR CERT Fix Test</h1>
+        <p>This tool tests the fixed QR CERT endpoint that can handle both old and new data formats.</p>
+        
+        <h2>Authentication</h2>
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <input type="text" id="username" value="admin" />
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" value="admin123" />
+        </div>
+        <button onclick="login()">Login</button>
+        
+        <div id="authResult" class="result info" style="display: none;"></div>
+        
+        <h2>Test QR CERT Submission</h2>
+        <div class="form-group">
+            <label for="qrUrl">QR URL:</label>
+            <input type="text" id="qrUrl" value="https://malicious-qr-site.com/steal-data" />
+        </div>
+        <div class="form-group">
+            <label for="riskScore">Risk Score:</label>
+            <input type="number" id="riskScore" value="85" min="50" max="100" />
+        </div>
+        <div class="form-group">
+            <label for="comments">User Comments:</label>
+            <textarea id="comments" rows="3">Found this suspicious QR code on a poster. It seems to lead to a credential harvesting site.</textarea>
+        </div>
+        
+        <button onclick="testOldFormat()" id="oldFormatBtn" disabled>Test Old Format</button>
+        <button onclick="testNewFormat()" id="newFormatBtn" disabled>Test New Format</button>
+        <button onclick="testMixedFormat()" id="mixedFormatBtn" disabled>Test Mixed Format</button>
+        
+        <div id="testResult" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        let authToken = null;
+        const API_BASE = 'http://localhost:8000';
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('authResult');
+            
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Logging in...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('password', password);
+                
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.access_token) {
+                    authToken = data.access_token;
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ Login successful!`;
+                    document.getElementById('oldFormatBtn').disabled = false;
+                    document.getElementById('newFormatBtn').disabled = false;
+                    document.getElementById('mixedFormatBtn').disabled = false;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Login failed: ${data.detail || 'Unknown error'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `💥 Login error: ${error.message}`;
+            }
+        }
+
+        async function testOldFormat() {
+            if (!authToken) {
+                alert('Please login first!');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing OLD format (frontend compatibility)...';
+            
+            // Old format that frontend might be sending
+            const reportData = {
+                qr_url: document.getElementById('qrUrl').value,
+                risk_score: parseInt(document.getElementById('riskScore').value),
+                risk_level: "high",
+                user_comments: document.getElementById('comments').value,
+                scan_id: `test-scan-${Date.now()}`
+            };
+            
+            await submitReport(reportData, "OLD FORMAT", resultDiv);
+        }
+
+        async function testNewFormat() {
+            if (!authToken) {
+                alert('Please login first!');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing NEW format (phishing detection style)...';
+            
+            // New format following phishing detection pattern
+            const reportData = {
+                url: document.getElementById('qrUrl').value,
+                content: `QR code detected leading to malicious site: ${document.getElementById('qrUrl').value}`,
+                risk_score: parseInt(document.getElementById('riskScore').value),
+                risk_level: "high",
+                classification: "malicious_qr_code",
+                confidence: parseInt(document.getElementById('riskScore').value) / 100.0,
+                reasoning: `QR code analysis detected high risk level with score ${document.getElementById('riskScore').value}/100`,
+                security_analysis: {
+                    classification: "malicious_qr_code",
+                    threat_indicators: {
+                        suspicious_qr_code: true,
+                        malicious_url: true
+                    }
+                },
+                comments: document.getElementById('comments').value
+            };
+            
+            await submitReport(reportData, "NEW FORMAT", resultDiv);
+        }
+
+        async function testMixedFormat() {
+            if (!authToken) {
+                alert('Please login first!');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.className = 'result loading';
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing MIXED format (partial data)...';
+            
+            // Mixed format with some fields from both
+            const reportData = {
+                qr_url: document.getElementById('qrUrl').value,  // Old field
+                url: document.getElementById('qrUrl').value,      // New field
+                risk_score: parseInt(document.getElementById('riskScore').value),
+                user_comments: document.getElementById('comments').value,  // Old field
+                comments: document.getElementById('comments').value        // New field
+            };
+            
+            await submitReport(reportData, "MIXED FORMAT", resultDiv);
+        }
+
+        async function submitReport(reportData, formatType, resultDiv) {
+            try {
+                console.log(`${formatType} - Sending data:`, reportData);
+                
+                const response = await fetch(`${API_BASE}/api/qr/report/cert`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(reportData)
+                });
+                
+                const data = await response.json();
+                console.log(`${formatType} - Response:`, data);
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ ${formatType} - QR CERT Report Submitted Successfully!
+Report ID: ${data.report_id}
+Message: ${data.message}
+Submitted At: ${new Date(data.submitted_at).toLocaleString()}
+
+🎉 The fixed endpoint handled ${formatType} correctly!
+📧 Check the backend logs for detailed processing information.`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ ${formatType} - Submission failed:
+Status: ${response.status}
+Error: ${data.detail || 'Unknown error'}
+
+This indicates the format is still not compatible.`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `💥 ${formatType} - Error: ${error.message}
+
+This suggests a network or parsing issue.`;
+            }
+        }
+    </script>
+</body>
+</html>

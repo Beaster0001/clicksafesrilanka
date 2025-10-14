@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""
+Test ML classifier with known malicious URLs
+"""
+import os
+import sys
+import asyncio
+from typing import List
+
+# Add current directory to path
+sys.path.insert(0, os.path.dirname(__file__))
+
+from qr.ml_service import get_classifier
+from qr.api import get_qr_api
+
+# Test URLs - known malicious and phishing examples
+MALICIOUS_URLS = [
+    "http://malware.testing.google.test/testing/malware/",
+    "http://phishing-test.com/login.php?redirect=bank.com",
+    "http://suspicious-site.tk/download.exe",
+    "http://192.168.1.1:8080/malicious.html",
+    "http://bit.ly/3fake-redirect-to-malware",
+    "http://evil-site.click/phishing/bank-login.php",
+    "http://malicious-qr.ml/steal-credentials.php",
+    "http://127.0.0.1:9999/malware-download",
+    "http://fake-bank.country/login?next=transfer",
+    "http://suspicious.racing/click-here-win-money"
+]
+
+SAFE_URLS = [
+    "https://www.google.com",
+    "https://github.com/microsoft/vscode",
+    "https://www.microsoft.com",
+    "https://stackoverflow.com/questions",
+    "https://docs.python.org"
+]
+
+def test_ml_classifier():
+    """Test ML classifier directly"""
+    print("=" * 60)
+    print("🧪 Testing ML Classifier Directly")
+    print("=" * 60)
+    
+    classifier = get_classifier()
+    
+    # Check if models are loaded
+    print(f"📊 Model loaded: {bool(classifier.model)}")
+    print(f"📊 Predictor loaded: {bool(classifier.predictor)}")
+    print(f"📊 Label encoder loaded: {bool(classifier.label_encoder)}")
+    print()
+    
+    print("🔍 Testing MALICIOUS URLs:")
+    print("-" * 40)
+    
+    for i, url in enumerate(MALICIOUS_URLS[:5], 1):
+        try:
+            result = classifier.calculate_risk_score(url)
+            risk_score = result.get('risk_score', 0)
+            risk_level = result.get('risk_level', 'unknown')
+            classification = result.get('classification', 'unknown')
+            confidence = result.get('confidence', 0)
+            
+            status = "✅ DETECTED" if risk_score >= 60 else "❌ MISSED"
+            
+            print(f"{i}. {url[:50]}...")
+            print(f"   Score: {risk_score}/100 | Level: {risk_level} | Class: {classification}")
+            print(f"   Confidence: {confidence:.2f} | {status}")
+            print()
+            
+        except Exception as e:
+            print(f"{i}. ERROR analyzing {url}: {str(e)}")
+            print()
+    
+    print("🔍 Testing SAFE URLs:")
+    print("-" * 40)
+    
+    for i, url in enumerate(SAFE_URLS[:3], 1):
+        try:
+            result = classifier.calculate_risk_score(url)
+            risk_score = result.get('risk_score', 0)
+            risk_level = result.get('risk_level', 'unknown')
+            classification = result.get('classification', 'unknown')
+            
+            status = "✅ SAFE" if risk_score < 40 else "⚠️ FALSE POSITIVE"
+            
+            print(f"{i}. {url}")
+            print(f"   Score: {risk_score}/100 | Level: {risk_level} | Class: {classification}")
+            print(f"   {status}")
+            print()
+            
+        except Exception as e:
+            print(f"{i}. ERROR analyzing {url}: {str(e)}")
+            print()
+
+async def test_qr_api():
+    """Test QR API with direct URL analysis"""
+    print("=" * 60)
+    print("🧪 Testing QR API URL Analysis")
+    print("=" * 60)
+    
+    qr_api = get_qr_api()
+    
+    print("🔍 Testing malicious URL through QR API:")
+    print("-" * 40)
+    
+    test_url = MALICIOUS_URLS[0]
+    print(f"Testing: {test_url}")
+    
+    try:
+        result = await qr_api.analyze_url_direct(test_url)
+        
+        print(f"Success: {result.get('success')}")
+        print(f"Processing time: {result.get('processing_time', 0):.2f}s")
+        
+        if result.get('security_analysis'):
+            sec_analysis = result['security_analysis']
+            print(f"ML Risk Score: {sec_analysis.get('risk_score', 'N/A')}")
+            print(f"ML Classification: {sec_analysis.get('classification', 'N/A')}")
+            print(f"ML Confidence: {sec_analysis.get('confidence', 'N/A')}")
+        
+        if result.get('combined_assessment'):
+            combined = result['combined_assessment']
+            print(f"Final Risk Score: {combined.get('final_risk_score', 'N/A')}")
+            print(f"Final Risk Level: {combined.get('final_risk_level', 'N/A')}")
+            print(f"Recommendation: {combined.get('recommendation', 'N/A')}")
+            print(f"Combined Confidence: {combined.get('confidence', 'N/A')}")
+        
+        if result.get('error'):
+            print(f"❌ Error: {result['error']}")
+            
+    except Exception as e:
+        print(f"❌ Exception: {str(e)}")
+
+def main():
+    """Run all tests"""
+    print("🚀 Starting Malicious URL Detection Tests")
+    print()
+    
+    # Test ML classifier directly
+    test_ml_classifier()
+    
+    # Test QR API
+    asyncio.run(test_qr_api())
+    
+    print("=" * 60)
+    print("🏁 Tests completed")
+
+if __name__ == "__main__":
+    main()
